@@ -5,6 +5,7 @@ import '../auth/login_screen.dart';
 import '../shared/create_announcement_screen.dart';
 import '../shared/recents_screen.dart';
 import '../shared/news_feed_screen.dart';
+import 'manage_units_screen.dart';
 
 class TechAdminHome extends StatefulWidget {
   const TechAdminHome({super.key});
@@ -27,16 +28,15 @@ class _TechAdminHomeState extends State<TechAdminHome> {
     _NavItem(icon: Icons.admin_panel_settings, label: 'Manage Viewer Admins'),
     _NavItem(icon: Icons.build_circle, label: 'Tech Assistance Requests'),
     _NavItem(icon: Icons.bug_report, label: 'Bug Reports'),
-
   ];
 
   final List<Widget> _pages = [
     const _PlaceholderPage(title: 'Dashboard'),
     const NewsFeedScreen(),
     const RecentsScreen(),
-    const CreateAnnouncementScreen(),    
+    const CreateAnnouncementScreen(),
     const _PlaceholderPage(title: 'Calendar'),
-    const _PlaceholderPage(title: 'Manage Units'),
+    const ManageUnitsScreen(),                              // ✅ Wired up
     const _PlaceholderPage(title: 'Manage Viewer Admins'),
     const _PlaceholderPage(title: 'Tech Assistance Requests'),
     const _PlaceholderPage(title: 'Bug Reports'),
@@ -54,7 +54,7 @@ class _TechAdminHomeState extends State<TechAdminHome> {
           children: [
             // Sidebar
             _buildSidebar(),
-           
+
             // Main Content
             Expanded(
               child: _pages[_selectedIndex],
@@ -69,15 +69,13 @@ class _TechAdminHomeState extends State<TechAdminHome> {
     final isDark = _isDarkMode;
     return Container(
       width: 250,
-      color: isDark
-          ? AppTheme.sidebarDark
-          : AppTheme.sidebarLight,
+      color: isDark ? AppTheme.sidebarDark : AppTheme.sidebarLight,
       child: Column(
         children: [
           // App Logo & Title
           Container(
-            padding: const EdgeInsets.symmetric(
-                vertical: 5, horizontal: 16),
+            padding:
+                const EdgeInsets.symmetric(vertical: 5, horizontal: 16),
             child: Row(
               children: [
                 const Icon(
@@ -102,8 +100,8 @@ class _TechAdminHomeState extends State<TechAdminHome> {
 
           // Role Badge
           Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 12, vertical: 1),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
             decoration: BoxDecoration(
               color: AppTheme.primaryBlue.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
@@ -111,8 +109,7 @@ class _TechAdminHomeState extends State<TechAdminHome> {
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.shield,
-                    size: 14, color: AppTheme.primaryBlue),
+                Icon(Icons.shield, size: 14, color: AppTheme.primaryBlue),
                 SizedBox(width: 6),
                 Text(
                   'Tech Admin',
@@ -127,8 +124,7 @@ class _TechAdminHomeState extends State<TechAdminHome> {
           ),
 
           const SizedBox(height: 8),
-
-      const Divider(),
+          const Divider(),
 
           // Nav Items
           Expanded(
@@ -185,27 +181,21 @@ class _TechAdminHomeState extends State<TechAdminHome> {
 
           // Dark Mode Toggle
           Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 8),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
                 Icon(
-                  _isDarkMode
-                      ? Icons.dark_mode
-                      : Icons.light_mode,
+                  _isDarkMode ? Icons.dark_mode : Icons.light_mode,
                   size: 18,
-                  color: isDark
-                      ? Colors.white70
-                      : Colors.black54,
+                  color: isDark ? Colors.white70 : Colors.black54,
                 ),
                 const SizedBox(width: 8),
                 Text(
                   _isDarkMode ? 'Dark Mode' : 'Light Mode',
                   style: TextStyle(
                     fontSize: 13,
-                    color: isDark
-                        ? Colors.white70
-                        : Colors.black54,
+                    color: isDark ? Colors.white70 : Colors.black54,
                   ),
                 ),
                 const Spacer(),
@@ -266,8 +256,7 @@ class _PlaceholderPage extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.construction,
-              size: 64, color: Colors.grey),
+          const Icon(Icons.construction, size: 64, color: Colors.grey),
           const SizedBox(height: 16),
           Text(
             title,
