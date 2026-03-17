@@ -5,6 +5,7 @@ import '../tech_admin/manage_units_screen.dart';
 import '../tech_admin/venue_management_screen.dart';
 import '../unit/personnel_enrolment_screen.dart';
 import 'viewer_announcements_screen.dart';
+import '../shared/calendar_screen.dart';
 
 class ViewerAdminHome extends StatefulWidget {
   const ViewerAdminHome({super.key});
@@ -32,8 +33,8 @@ class _ViewerAdminHomeState extends State<ViewerAdminHome> {
     const ManageUnitsScreen(isReadOnly: true),
     const PersonnelEnrolmentScreen(isReadOnly: true),
     const VenueManagementScreen(isReadOnly: true),
-    const _PlaceholderPage(title: 'Calendar'),
-  ];
+    const CalendarScreen(calendarType: CalendarType.viewerAdmin),  
+    ];
 
   @override
   Widget build(BuildContext context) {

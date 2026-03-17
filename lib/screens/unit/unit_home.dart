@@ -6,6 +6,7 @@ import '../shared/recents_screen.dart';
 import '../shared/news_feed_screen.dart';
 import 'personnel_enrolment_screen.dart';
 import 'account_information_screen.dart';
+import '../shared/calendar_screen.dart';
 
 class UnitHome extends StatefulWidget {
   const UnitHome({super.key});
@@ -43,7 +44,7 @@ class _UnitHomeState extends State<UnitHome> {
  final List<Widget> _pages = [
   const _PlaceholderPage(title: 'Dashboard'),   
   const NewsFeedScreen(),
-  const _PlaceholderPage(title: 'Calendar'),                   
+  const CalendarScreen(calendarType: CalendarType.unit),  
   const RecentsScreen(),                         
   const CreateAnnouncementScreen(),             
   const AccountInformationScreen(),  

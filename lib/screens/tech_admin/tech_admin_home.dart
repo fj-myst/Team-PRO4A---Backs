@@ -7,6 +7,8 @@ import '../shared/news_feed_screen.dart';
 import 'manage_units_screen.dart';
 import 'venue_management_screen.dart';
 import 'manage_viewer_admins_screen.dart';
+import 'tech_assistance_requests_screen.dart';
+import '../shared/calendar_screen.dart';
 
 class TechAdminHome extends StatefulWidget {
   const TechAdminHome({super.key});
@@ -41,13 +43,13 @@ class _TechAdminHomeState extends State<TechAdminHome> {
   final List<Widget> _pages = [
     const _PlaceholderPage(title: 'Dashboard'),                 // 1
     const NewsFeedScreen(),                                     // 2 ✅
-    const _PlaceholderPage(title: 'Calendar'),                  // 3
+    const CalendarScreen(calendarType: CalendarType.techAdmin), // 3 ✅ 
     const RecentsScreen(),                                      // 4 ✅
     const CreateAnnouncementScreen(),                           // 5 ✅
     const ManageUnitsScreen(),                                  // 6 ✅
     const ManageViewerAdminsScreen(),                           // 7 ✅
     const VenueManagementScreen(),                              // 8 ✅
-    const _PlaceholderPage(title: 'Tech Assistance Requests'),  // 9
+    const TechAssistanceRequestsScreen(),                       // 9 ✅
     const _PlaceholderPage(title: 'Bug Reports'),               // 10
   ];
 

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../app_theme.dart';
 import '../../services/announcement_service.dart';
 import 'view_announcement_screen.dart';
 
 class NewsFeedScreen extends StatefulWidget {
-  const NewsFeedScreen({super.key});
+  final bool isTechAdmin;                                          // ✅ ADDED
+  const NewsFeedScreen({super.key, this.isTechAdmin = false});    // ✅ ADDED
 
   @override
   State<NewsFeedScreen> createState() => _NewsFeedScreenState();
@@ -16,7 +16,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
   final _service = AnnouncementService();
   List<Map<String, dynamic>> _announcements = [];
   bool _isLoading = true;
-  String _debugInfo = '';
 
   @override
   void initState() {
@@ -24,30 +23,21 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     _loadAnnouncements();
   }
 
-  void _loadAnnouncements() async {
+  Future<void> _loadAnnouncements() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
-
-    // ── DEBUG: show current user UID ──
-    final currentUser = FirebaseAuth.instance.currentUser;
-    final uid = currentUser?.uid ?? 'NOT LOGGED IN';
-    debugPrint('=== NEWS FEED DEBUG ===');
-    debugPrint('Current User UID: $uid');
-
-    final data = await _service.getNewsFeed();
-
-    debugPrint('Announcements found: ${data.length}');
-    for (var a in data) {
-      debugPrint('Title: ${a['title']} | visibleTo: ${a['visibleTo']}');
+    try {
+      // ✅ switch data source based on role
+      final data = widget.isTechAdmin
+          ? await _service.getTechAdminFeed()
+          : await _service.getNewsFeed();
+      if (!mounted) return;
+      setState(() => _announcements = data);
+    } catch (e) {
+      if (!mounted) return;
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-    debugPrint('======================');
-
-    if (!mounted) return;
-    setState(() {
-      _announcements = data;
-      _isLoading = false;
-      _debugInfo = 'Logged in as: $uid\nAnnouncements found: ${data.length}';
-    });
   }
 
   @override
@@ -60,14 +50,14 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            // Header
+            // ── HEADER ──
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'News Feed',
                       style: TextStyle(
                         fontSize: 28,
@@ -75,8 +65,11 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                       ),
                     ),
                     Text(
-                      'Announcements you are mentioned in',
-                      style: TextStyle(color: Colors.grey),
+                      // ✅ subtitle differs per role
+                      widget.isTechAdmin
+                          ? 'Announcements you are tagged in or need tech assistance'
+                          : 'Announcements you are mentioned in',
+                      style: const TextStyle(color: Colors.grey),
                     ),
                   ],
                 ),
@@ -87,51 +80,18 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 24),
 
-            // ── DEBUG INFO BOX ──
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.amber),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '🔍 Debug Info',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.amber),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _debugInfo.isEmpty
-                        ? 'Loading...'
-                        : _debugInfo,
-                    style: const TextStyle(
-                        fontSize: 12, color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Content
+            // ── CONTENT ──
             Expanded(
               child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator())
                   : _announcements.isEmpty
                       ? _buildEmptyState()
                       : ListView.builder(
                           itemCount: _announcements.length,
-                          itemBuilder: (context, index) {
-                            return _buildCard(
-                                _announcements[index]);
-                          },
+                          itemBuilder: (context, index) =>
+                              _buildCard(_announcements[index]),
                         ),
             ),
           ],
@@ -145,8 +105,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.feed,
-              size: 80, color: Colors.grey.shade300),
+          Icon(Icons.feed, size: 80, color: Colors.grey.shade300),
           const SizedBox(height: 16),
           const Text(
             'No announcements yet',
@@ -157,9 +116,11 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Announcements you are mentioned in will appear here',
-            style: TextStyle(color: Colors.grey),
+          Text(
+            widget.isTechAdmin
+                ? 'Announcements tagged to you or needing tech assistance will appear here'
+                : 'Announcements you are mentioned in will appear here',
+            style: const TextStyle(color: Colors.grey),
             textAlign: TextAlign.center,
           ),
         ],
@@ -172,8 +133,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     final dateTime = announcement['dateTime'] != null
         ? (announcement['dateTime'] as Timestamp).toDate()
         : null;
-    final attendeeType =
-        announcement['attendeeType'] ?? 'Physical';
+    final attendeeType = announcement['attendeeType'] ?? 'Physical';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -186,6 +146,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+
+            // ── TITLE ROW + BADGES ──
             Row(
               children: [
                 Expanded(
@@ -198,6 +160,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
+                // Attendee type badge
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 8, vertical: 4),
@@ -237,6 +200,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                     ],
                   ),
                 ),
+                // Tech assist badge
                 if (needsTech) ...[
                   const SizedBox(width: 6),
                   Container(
@@ -266,6 +230,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
               ],
             ),
             const SizedBox(height: 12),
+
+            // ── INFO CHIPS ──
             Wrap(
               spacing: 16,
               runSpacing: 8,
@@ -286,6 +252,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
               ],
             ),
             const SizedBox(height: 16),
+
+            // ── VIEW BUTTON ──
             Align(
               alignment: Alignment.centerRight,
               child: OutlinedButton.icon(
@@ -294,8 +262,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                 label: const Text('View'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppTheme.primaryBlue,
-                  side: const BorderSide(
-                      color: AppTheme.primaryBlue),
+                  side: const BorderSide(color: AppTheme.primaryBlue),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8)),
                 ),
@@ -314,8 +281,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
         Icon(icon, size: 14, color: Colors.grey),
         const SizedBox(width: 4),
         Text(label,
-            style: const TextStyle(
-                fontSize: 13, color: Colors.grey)),
+            style: const TextStyle(fontSize: 13, color: Colors.grey)),
       ],
     );
   }
@@ -324,8 +290,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ViewAnnouncementScreen(
-            announcement: announcement),
+        builder: (_) =>
+            ViewAnnouncementScreen(announcement: announcement),
       ),
     );
   }

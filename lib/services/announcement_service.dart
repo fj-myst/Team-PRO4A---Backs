@@ -223,4 +223,49 @@ class AnnouncementService {
       return [];
     }
   }
+
+  Future<List<Map<String, dynamic>>> getTechAdminFeed() async {
+  try {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return [];
+
+    // Query 1: announcements where Tech Admin's unit doc is in visibleTo
+    final taggedSnapshot = await _firestore
+        .collection('announcements')
+        .where('visibleTo', arrayContains: currentUser.uid)
+        .orderBy('createdAt', descending: true)
+        .get();
+
+    // Query 2: announcements that need tech assistance
+    final techSnapshot = await _firestore
+        .collection('announcements')
+        .where('needsTechAssist', isEqualTo: true)
+        .orderBy('createdAt', descending: true)
+        .get();
+
+    // Merge and deduplicate by doc ID
+    final Map<String, Map<String, dynamic>> merged = {};
+
+    for (var doc in taggedSnapshot.docs) {
+      merged[doc.id] = {'id': doc.id, ...doc.data()};
+    }
+    for (var doc in techSnapshot.docs) {
+      merged[doc.id] = {'id': doc.id, ...doc.data()};
+    }
+
+    // Sort merged results by dateTime descending
+    final result = merged.values.toList();
+    result.sort((a, b) {
+      final aTime = a['createdAt'];
+      final bTime = b['createdAt'];
+      if (aTime == null || bTime == null) return 0;
+      return (bTime as Timestamp).compareTo(aTime as Timestamp);
+    });
+
+    return result;
+  } catch (e) {
+    return [];
+  }
+}
+
 }
