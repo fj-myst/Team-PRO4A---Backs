@@ -1,29 +1,18 @@
 import 'package:flutter/material.dart';
-import '../../services/auth_service.dart';
-import '../tech_admin/tech_admin_home.dart';
-import '../viewer_admin/viewer_admin_home.dart';
-import '../unit/unit_home.dart';
-import '../personnel/personnel_home.dart';
-import 'forgot_password_screen.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class ForgotPasswordScreen extends StatefulWidget {
+  const ForgotPasswordScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _isLoading = false;
-  String _errorMessage = '';
-  bool _obscurePassword = true;
 
   @override
   void dispose() {
     _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
@@ -37,7 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ? SingleChildScrollView(
               child: Column(
                 children: [
-                  // Image + overlay
                   Stack(
                     children: [
                       Container(
@@ -78,7 +66,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
@@ -105,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
 
-                // Right login panel
+                // Right panel
                 Expanded(
                   flex: 4,
                   child: Container(
@@ -150,12 +137,12 @@ class _LoginScreenState extends State<LoginScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Login",
+          "Forgot Password",
           style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 5),
         const Text(
-          "Please enter your details",
+          "Enter your email and we'll send you a reset link.",
           style: TextStyle(fontSize: 16, color: Colors.black54),
         ),
         const SizedBox(height: 30),
@@ -170,125 +157,46 @@ class _LoginScreenState extends State<LoginScreen> {
             hintText: "Enter your email address...",
             filled: true,
             fillColor: Colors.white,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Password
-        const Text("Password"),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _passwordController,
-          obscureText: _obscurePassword, // 👈 was: obscureText: true
-          decoration: InputDecoration(
-            hintText: "Enter your password...",
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            suffixIcon: IconButton(
-              // 👈 add this
-              icon: Icon(
-                _obscurePassword ? Icons.visibility_off : Icons.visibility,
-              ),
-              onPressed: () {
-                setState(() {
-                  _obscurePassword = !_obscurePassword;
-                });
-              },
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 30),
 
-        // Forgot password
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
-              );
-            },
-            child: const Text("Forgot Password?"),
-          ),
-        ),
-
-        // Error message
-        if (_errorMessage.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text(
-              _errorMessage,
-              style: const TextStyle(color: Colors.red),
-            ),
-          ),
-
-        const SizedBox(height: 10),
-
-        // Login button
+        // Send reset link button
         SizedBox(
           width: double.infinity,
           height: 50,
           child: ElevatedButton(
-            onPressed: _isLoading ? null : _login,
+            onPressed: () {
+              // TODO: hook up Firebase password reset
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1D3557),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            child: _isLoading
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text(
-                    "LOGIN",
-                    style: TextStyle(fontSize: 16, letterSpacing: 1.2),
-                  ),
+            child: const Text(
+              "SEND RESET LINK",
+              style: TextStyle(fontSize: 16, letterSpacing: 1.2),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Back to login
+        Center(
+          child: TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              "Back to Login",
+              style: TextStyle(color: Color(0xFF1D3557)),
+            ),
           ),
         ),
       ],
     );
-  }
-
-  void _login() async {
-    setState(() {
-      _errorMessage = '';
-      _isLoading = true;
-    });
-
-    final result = await AuthService().login(
-      _emailController.text.trim(),
-      _passwordController.text.trim(),
-    );
-
-    setState(() => _isLoading = false);
-
-    if (result['success']) {
-      final String role = result['role'];
-
-      Widget home;
-      if (role == 'tech_admin') {
-        home = const TechAdminHome();
-      } else if (role == 'viewer_admin') {
-        home = const ViewerAdminHome();
-      } else if (role == 'unit') {
-        home = const UnitHome();
-      } else if (role == 'personnel') {
-        home = const PersonnelHome();
-      } else {
-        setState(
-          () => _errorMessage = 'Unknown role. Contact your administrator.',
-        );
-        return;
-      }
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => home),
-      );
-    } else {
-      setState(() => _errorMessage = result['message']);
-    }
   }
 }
