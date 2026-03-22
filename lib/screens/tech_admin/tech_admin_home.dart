@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../app_theme.dart';
 import '../../widgets/app_sidebar.dart';
+import '../../widgets/notification_bell.dart';
 import '../shared/create_announcement_screen.dart';
 import '../shared/recents_screen.dart';
 import '../shared/news_feed_screen.dart';
@@ -60,6 +61,23 @@ class _TechAdminHomeState extends State<TechAdminHome> {
     const BugReportsManagementScreen(),                          // 9
   ];
 
+  String get _currentPageTitle {
+    const titles = [
+      'Dashboard',
+      'News Feed',
+      'Calendar',
+      'Recents',
+      'Create Announcement',
+      'Manage Units',
+      'Manage Viewer Admins',
+      'Venue Management',
+      'Tech Assistance Requests',
+      'Bug Reports',
+    ];
+    if (_selectedIndex < titles.length) return titles[_selectedIndex];
+    return 'TEAM-PRO4A';
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -82,9 +100,43 @@ class _TechAdminHomeState extends State<TechAdminHome> {
               roleColor: AppTheme.primaryBlue,
               roleIcon: Icons.shield,
             ),
-            Expanded(child: _pages[_selectedIndex]),
+            Expanded(
+              child: Column(
+                children: [
+                  _buildTopBar(context),
+                  Expanded(child: _pages[_selectedIndex]),
+                ],
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTopBar(BuildContext context) {
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        border: Border(
+          bottom: BorderSide(color: Colors.grey.shade200, width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          Text(
+            _currentPageTitle,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          const NotificationBell(),
+          const SizedBox(width: 8),
+        ],
       ),
     );
   }

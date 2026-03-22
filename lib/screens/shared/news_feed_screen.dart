@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../app_theme.dart';
 import '../../services/announcement_service.dart';
 import 'view_announcement_screen.dart';
 
+// Filter options for Tech Admin news feed
+enum _FeedFilter { all, tagged, techAssistance }
+
 class NewsFeedScreen extends StatefulWidget {
-  final bool isTechAdmin;                                          // ✅ ADDED
-  const NewsFeedScreen({super.key, this.isTechAdmin = false});    // ✅ ADDED
+  final bool isTechAdmin;
+  const NewsFeedScreen({super.key, this.isTechAdmin = false});
 
   @override
   State<NewsFeedScreen> createState() => _NewsFeedScreenState();
@@ -14,12 +18,20 @@ class NewsFeedScreen extends StatefulWidget {
 
 class _NewsFeedScreenState extends State<NewsFeedScreen> {
   final _service = AnnouncementService();
+
   List<Map<String, dynamic>> _announcements = [];
   bool _isLoading = true;
+  _FeedFilter _activeFilter = _FeedFilter.all;
+
+  // Tech Admin's own UID — used to determine "tagged" announcements
+  String? _currentUid;
 
   @override
   void initState() {
     super.initState();
+    if (widget.isTechAdmin) {
+      _currentUid = FirebaseAuth.instance.currentUser?.uid;
+    }
     _loadAnnouncements();
   }
 
@@ -27,7 +39,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      // ✅ switch data source based on role
       final data = widget.isTechAdmin
           ? await _service.getTechAdminFeed()
           : await _service.getNewsFeed();
@@ -40,8 +51,43 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     }
   }
 
+  // Returns the filtered list based on active chip
+  List<Map<String, dynamic>> get _filteredAnnouncements {
+    if (!widget.isTechAdmin || _activeFilter == _FeedFilter.all) {
+      return _announcements;
+    }
+
+    return _announcements.where((a) {
+      final visibleTo = List<String>.from(a['visibleTo'] ?? []);
+      final needsTech = a['needsTechAssist'] == true;
+      final isTagged =
+          _currentUid != null && visibleTo.contains(_currentUid);
+
+      if (_activeFilter == _FeedFilter.tagged) return isTagged;
+      if (_activeFilter == _FeedFilter.techAssistance) return needsTech;
+      return true;
+    }).toList();
+  }
+
+  // Determines the category of an announcement for badge display
+  _AnnouncementCategory _getCategory(Map<String, dynamic> a) {
+    if (!widget.isTechAdmin) return _AnnouncementCategory.none;
+
+    final visibleTo = List<String>.from(a['visibleTo'] ?? []);
+    final needsTech = a['needsTechAssist'] == true;
+    final isTagged =
+        _currentUid != null && visibleTo.contains(_currentUid);
+
+    if (isTagged && needsTech) return _AnnouncementCategory.both;
+    if (isTagged) return _AnnouncementCategory.tagged;
+    if (needsTech) return _AnnouncementCategory.techAssistance;
+    return _AnnouncementCategory.none;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final filtered = _filteredAnnouncements;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Padding(
@@ -65,7 +111,6 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                       ),
                     ),
                     Text(
-                      // ✅ subtitle differs per role
                       widget.isTechAdmin
                           ? 'Announcements you are tagged in or need tech assistance'
                           : 'Announcements you are mentioned in',
@@ -80,18 +125,47 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                 ),
               ],
             ),
+
+            // ── FILTER CHIPS (Tech Admin only) ──
+            if (widget.isTechAdmin) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _filterChip(
+                    label: 'All',
+                    filter: _FeedFilter.all,
+                    color: AppTheme.primaryBlue,
+                  ),
+                  const SizedBox(width: 8),
+                  _filterChip(
+                    label: 'Tagged',
+                    filter: _FeedFilter.tagged,
+                    color: Colors.blue,
+                    icon: Icons.label,
+                  ),
+                  const SizedBox(width: 8),
+                  _filterChip(
+                    label: 'Tech Assistance',
+                    filter: _FeedFilter.techAssistance,
+                    color: Colors.green,
+                    icon: Icons.build_circle,
+                  ),
+                ],
+              ),
+            ],
+
             const SizedBox(height: 24),
 
             // ── CONTENT ──
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : _announcements.isEmpty
+                  : filtered.isEmpty
                       ? _buildEmptyState()
                       : ListView.builder(
-                          itemCount: _announcements.length,
+                          itemCount: filtered.length,
                           itemBuilder: (context, index) =>
-                              _buildCard(_announcements[index]),
+                              _buildCard(filtered[index]),
                         ),
             ),
           ],
@@ -100,7 +174,66 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     );
   }
 
+  // ── Filter Chip Widget ──
+  Widget _filterChip({
+    required String label,
+    required _FeedFilter filter,
+    required Color color,
+    IconData? icon,
+  }) {
+    final isActive = _activeFilter == filter;
+    return GestureDetector(
+      onTap: () => setState(() => _activeFilter = filter),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? color : color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive ? color : color.withOpacity(0.3),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon,
+                  size: 13, color: isActive ? Colors.white : color),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isActive ? Colors.white : color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
+    String message;
+    if (widget.isTechAdmin) {
+      switch (_activeFilter) {
+        case _FeedFilter.tagged:
+          message = 'No announcements where you are tagged';
+          break;
+        case _FeedFilter.techAssistance:
+          message = 'No announcements needing tech assistance';
+          break;
+        default:
+          message =
+              'Announcements tagged to you or needing tech assistance will appear here';
+      }
+    } else {
+      message = 'Announcements you are mentioned in will appear here';
+    }
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -117,9 +250,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            widget.isTechAdmin
-                ? 'Announcements tagged to you or needing tech assistance will appear here'
-                : 'Announcements you are mentioned in will appear here',
+            message,
             style: const TextStyle(color: Colors.grey),
             textAlign: TextAlign.center,
           ),
@@ -134,6 +265,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
         ? (announcement['dateTime'] as Timestamp).toDate()
         : null;
     final attendeeType = announcement['attendeeType'] ?? 'Physical';
+    final category = _getCategory(announcement);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -160,72 +292,48 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
+
                 // Attendee type badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: attendeeType == 'Virtual'
-                        ? Colors.purple.withOpacity(0.1)
-                        : Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: attendeeType == 'Virtual'
-                          ? Colors.purple.withOpacity(0.5)
-                          : Colors.blue.withOpacity(0.5),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        attendeeType == 'Virtual'
-                            ? Icons.video_call
-                            : Icons.person,
-                        size: 11,
-                        color: attendeeType == 'Virtual'
-                            ? Colors.purple
-                            : Colors.blue,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        attendeeType,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: attendeeType == 'Virtual'
-                              ? Colors.purple
-                              : Colors.blue,
-                        ),
-                      ),
-                    ],
-                  ),
+                _buildBadge(
+                  label: attendeeType,
+                  icon: attendeeType == 'Virtual'
+                      ? Icons.video_call
+                      : Icons.person,
+                  color: attendeeType == 'Virtual'
+                      ? Colors.purple
+                      : Colors.blue,
                 ),
-                // Tech assist badge
-                if (needsTech) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: Colors.orange.withOpacity(0.5)),
+
+                // ── Tech Admin category badges ──
+                if (widget.isTechAdmin) ...[
+                  if (category == _AnnouncementCategory.tagged ||
+                      category == _AnnouncementCategory.both) ...[
+                    const SizedBox(width: 6),
+                    _buildBadge(
+                      label: 'Tagged',
+                      icon: Icons.label,
+                      color: Colors.blue,
                     ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.build_circle,
-                            size: 11, color: Colors.orange),
-                        SizedBox(width: 4),
-                        Text(
-                          'Tech Assist',
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.orange),
-                        ),
-                      ],
+                  ],
+                  if (category == _AnnouncementCategory.techAssistance ||
+                      category == _AnnouncementCategory.both) ...[
+                    const SizedBox(width: 6),
+                    _buildBadge(
+                      label: 'Tech Assist',
+                      icon: Icons.build_circle,
+                      color: Colors.green,
                     ),
-                  ),
+                  ],
+                ] else ...[
+                  // Non-Tech Admin: keep original orange tech assist badge
+                  if (needsTech) ...[
+                    const SizedBox(width: 6),
+                    _buildBadge(
+                      label: 'Tech Assist',
+                      icon: Icons.build_circle,
+                      color: Colors.orange,
+                    ),
+                  ],
                 ],
               ],
             ),
@@ -257,7 +365,8 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: OutlinedButton.icon(
-                onPressed: () => _viewAnnouncement(announcement),
+                onPressed: () => ViewAnnouncementScreen.show(
+                    context, announcement),
                 icon: const Icon(Icons.visibility, size: 16),
                 label: const Text('View'),
                 style: OutlinedButton.styleFrom(
@@ -274,6 +383,32 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
     );
   }
 
+  Widget _buildBadge({
+    required String label,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildInfoChip(IconData icon, String label) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -285,7 +420,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
       ],
     );
   }
-
-  void _viewAnnouncement(Map<String, dynamic> announcement) =>
-    ViewAnnouncementScreen.show(context, announcement);
 }
+
+// Internal enum to categorize announcements for Tech Admin
+enum _AnnouncementCategory { none, tagged, techAssistance, both }

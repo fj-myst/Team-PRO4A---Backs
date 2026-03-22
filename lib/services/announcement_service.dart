@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'notification_service.dart';
 
 class AnnouncementService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -28,7 +29,7 @@ class AnnouncementService {
         return {'success': false, 'message': 'Not logged in.'};
       }
 
-      // ✅ fetch creator's name from users collection
+      // Fetch creator's name from users collection
       final userDoc = await _firestore
           .collection('users')
           .doc(currentUser.uid)
@@ -37,7 +38,7 @@ class AnnouncementService {
 
       final List<String> visibleTo = [...attendeeUnitIds];
 
-      await _firestore.collection('announcements').add({
+      final docRef = await _firestore.collection('announcements').add({
         'title': title,
         'authority': authority,
         'toPreside': toPreside,
@@ -54,10 +55,91 @@ class AnnouncementService {
         'tasks': tasks,
         'visibleTo': visibleTo,
         'createdBy': currentUser.uid,
-        'createdByName': createdByName,       // ✅ ADDED
+        'createdByName': createdByName,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      // Fire notifications for all recipients except the creator
+      await NotificationService.createNotificationsForAnnouncement(
+        announcementId: docRef.id,
+        announcementTitle: title,
+        visibleTo: visibleTo,
+        actorUid: currentUser.uid,
+        actorName: createdByName,
+        type: 'mentioned',
+      );
+
+      return {'success': true};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  // Update announcement
+  Future<Map<String, dynamic>> updateAnnouncement({
+    required String announcementId,
+    required String title,
+    required String authority,
+    required String toPreside,
+    required String attendeeType,
+    required List<String> attendeeUnitIds,
+    required Map<String, String> specificPersonnelPerUnit,
+    required String invitedOrganizations,
+    required String invitedNames,
+    required List<String> agendaItems,
+    required DateTime dateTime,
+    required String venueId,
+    required String venueName,
+    required bool needsTechAssist,
+    required String tasks,
+  }) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        return {'success': false, 'message': 'Not logged in.'};
+      }
+
+      // Fetch editor's name from users collection (same pattern as create)
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+      final editorName = userDoc.data()?['name'] ?? 'Unknown';
+
+      final List<String> visibleTo = [...attendeeUnitIds];
+
+      await _firestore
+          .collection('announcements')
+          .doc(announcementId)
+          .update({
+        'title': title,
+        'authority': authority,
+        'toPreside': toPreside,
+        'attendeeType': attendeeType,
+        'attendeeUnitIds': attendeeUnitIds,
+        'specificPersonnelPerUnit': specificPersonnelPerUnit,
+        'invitedOrganizations': invitedOrganizations,
+        'invitedNames': invitedNames,
+        'agendaItems': agendaItems,
+        'dateTime': Timestamp.fromDate(dateTime),
+        'venueId': venueId,
+        'venueName': venueName,
+        'needsTechAssist': needsTechAssist,
+        'tasks': tasks,
+        'visibleTo': visibleTo,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Fire notifications for all recipients except the editor
+      await NotificationService.createNotificationsForAnnouncement(
+        announcementId: announcementId,
+        announcementTitle: title,
+        visibleTo: visibleTo,
+        actorUid: currentUser.uid,
+        actorName: editorName,
+        type: 'announcement_edited',
+      );
 
       return {'success': true};
     } catch (e) {
@@ -145,55 +227,6 @@ class AnnouncementService {
     }
   }
 
-  // Update announcement
-  Future<Map<String, dynamic>> updateAnnouncement({
-    required String announcementId,
-    required String title,
-    required String authority,
-    required String toPreside,
-    required String attendeeType,
-    required List<String> attendeeUnitIds,
-    required Map<String, String> specificPersonnelPerUnit,
-    required String invitedOrganizations,
-    required String invitedNames,
-    required List<String> agendaItems,
-    required DateTime dateTime,
-    required String venueId,
-    required String venueName,
-    required bool needsTechAssist,
-    required String tasks,
-  }) async {
-    try {
-      final List<String> visibleTo = [...attendeeUnitIds];
-
-      await _firestore
-          .collection('announcements')
-          .doc(announcementId)
-          .update({
-        'title': title,
-        'authority': authority,
-        'toPreside': toPreside,
-        'attendeeType': attendeeType,
-        'attendeeUnitIds': attendeeUnitIds,
-        'specificPersonnelPerUnit': specificPersonnelPerUnit,
-        'invitedOrganizations': invitedOrganizations,
-        'invitedNames': invitedNames,
-        'agendaItems': agendaItems,
-        'dateTime': Timestamp.fromDate(dateTime),
-        'venueId': venueId,
-        'venueName': venueName,
-        'needsTechAssist': needsTechAssist,
-        'tasks': tasks,
-        'visibleTo': visibleTo,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-      return {'success': true};
-    } catch (e) {
-      return {'success': false, 'message': e.toString()};
-    }
-  }
-
   // Get announcements where current user's unit is in visibleTo (News Feed)
   Future<List<Map<String, dynamic>>> getNewsFeed() async {
     try {
@@ -225,47 +258,46 @@ class AnnouncementService {
   }
 
   Future<List<Map<String, dynamic>>> getTechAdminFeed() async {
-  try {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) return [];
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) return [];
 
-    // Query 1: announcements where Tech Admin's unit doc is in visibleTo
-    final taggedSnapshot = await _firestore
-        .collection('announcements')
-        .where('visibleTo', arrayContains: currentUser.uid)
-        .orderBy('createdAt', descending: true)
-        .get();
+      // Query 1: announcements where Tech Admin's unit doc is in visibleTo
+      final taggedSnapshot = await _firestore
+          .collection('announcements')
+          .where('visibleTo', arrayContains: currentUser.uid)
+          .orderBy('createdAt', descending: true)
+          .get();
 
-    // Query 2: announcements that need tech assistance
-    final techSnapshot = await _firestore
-        .collection('announcements')
-        .where('needsTechAssist', isEqualTo: true)
-        .orderBy('createdAt', descending: true)
-        .get();
+      // Query 2: announcements that need tech assistance
+      final techSnapshot = await _firestore
+          .collection('announcements')
+          .where('needsTechAssist', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .get();
 
-    // Merge and deduplicate by doc ID
-    final Map<String, Map<String, dynamic>> merged = {};
+      // Merge and deduplicate by doc ID
+      final Map<String, Map<String, dynamic>> merged = {};
 
-    for (var doc in taggedSnapshot.docs) {
-      merged[doc.id] = {'id': doc.id, ...doc.data()};
+      for (var doc in taggedSnapshot.docs) {
+        merged[doc.id] = {'id': doc.id, ...doc.data()};
+      }
+      for (var doc in techSnapshot.docs) {
+        merged[doc.id] = {'id': doc.id, ...doc.data()};
+      }
+
+      // Sort merged results by createdAt descending
+      final result = merged.values.toList();
+      result.sort((a, b) {
+        final aTime = a['createdAt'];
+        final bTime = b['createdAt'];
+        if (aTime == null || bTime == null) return 0;
+        return (bTime as Timestamp).compareTo(aTime as Timestamp);
+      });
+
+      return result;
+    } catch (e) {
+      return [];
     }
-    for (var doc in techSnapshot.docs) {
-      merged[doc.id] = {'id': doc.id, ...doc.data()};
-    }
-
-    // Sort merged results by dateTime descending
-    final result = merged.values.toList();
-    result.sort((a, b) {
-      final aTime = a['createdAt'];
-      final bTime = b['createdAt'];
-      if (aTime == null || bTime == null) return 0;
-      return (bTime as Timestamp).compareTo(aTime as Timestamp);
-    });
-
-    return result;
-  } catch (e) {
-    return [];
   }
-}
-
 }

@@ -571,7 +571,7 @@ class _ManageViewerAdminsScreenState
         'email': email,
         'position': position,
         'role': 'viewer_admin',
-        'isActive': true,
+        'isActive': true,  // ← already there
         'createdBy': currentAdmin.uid,
         'createdAt': FieldValue.serverTimestamp(),
       });

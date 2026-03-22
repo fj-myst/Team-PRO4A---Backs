@@ -6,8 +6,8 @@ import '../../app_theme.dart';
 import '../../firebase_options.dart';
 
 class ManageUnitsScreen extends StatefulWidget {
-  final bool isReadOnly;                                          // ✅ ADDED
-  const ManageUnitsScreen({super.key, this.isReadOnly = false}); // ✅ ADDED
+  final bool isReadOnly;
+  const ManageUnitsScreen({super.key, this.isReadOnly = false});
 
   @override
   State<ManageUnitsScreen> createState() => _ManageUnitsScreenState();
@@ -44,7 +44,7 @@ class _ManageUnitsScreenState extends State<ManageUnitsScreen> {
       if (!mounted) return;
       _showSnackbar('Error loading units: $e', isError: true);
     } finally {
-      if (mounted) setState(() => _isLoading = false);  // ✅ finally block
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -79,7 +79,6 @@ class _ManageUnitsScreenState extends State<ManageUnitsScreen> {
                     ),
                   ],
                 ),
-                // ✅ hidden when read-only
                 if (!widget.isReadOnly)
                   ElevatedButton.icon(
                     onPressed: () => _showAddUnitDialog(),
@@ -229,7 +228,6 @@ class _ManageUnitsScreenState extends State<ManageUnitsScreen> {
                   ),
                 ),
 
-                // ✅ Actions hidden when read-only
                 if (!widget.isReadOnly)
                   PopupMenuButton<String>(
                     onSelected: (value) {
@@ -294,7 +292,7 @@ class _ManageUnitsScreenState extends State<ManageUnitsScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) {                          // ✅ dialogContext
+      builder: (dialogContext) {
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) {
             return AlertDialog(
@@ -421,7 +419,7 @@ class _ManageUnitsScreenState extends State<ManageUnitsScreen> {
                 TextButton(
                   onPressed: isSubmitting
                       ? null
-                      : () => Navigator.pop(dialogContext), // ✅ dialogContext
+                      : () => Navigator.pop(dialogContext),
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton.icon(
@@ -457,10 +455,10 @@ class _ManageUnitsScreenState extends State<ManageUnitsScreen> {
                             password: password,
                           );
 
-                          if (!dialogContext.mounted) return; // ✅ dialogContext
+                          if (!dialogContext.mounted) return;
 
                           if (result['success']) {
-                            Navigator.pop(dialogContext);     // ✅ dialogContext
+                            Navigator.pop(dialogContext);
                             _showSnackbar(
                                 'Unit "$name" created successfully! ✅');
                             _loadUnits();
@@ -509,7 +507,7 @@ class _ManageUnitsScreenState extends State<ManageUnitsScreen> {
       }
 
       secondaryApp = await Firebase.initializeApp(
-        name: 'secondary_${DateTime.now().millisecondsSinceEpoch}', // ✅ unique name
+        name: 'secondary_${DateTime.now().millisecondsSinceEpoch}',
         options: DefaultFirebaseOptions.currentPlatform,
       );
       final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
@@ -527,6 +525,7 @@ class _ManageUnitsScreenState extends State<ManageUnitsScreen> {
         'name': name,
         'email': email,
         'role': 'unit',
+        'isActive': true, // ← FIXED
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -571,57 +570,59 @@ class _ManageUnitsScreenState extends State<ManageUnitsScreen> {
           .collection('units')
           .doc(unit['id'])
           .update({'isActive': newStatus});
-      if (!mounted) return;                               // ✅ mounted check
+      if (!mounted) return;
       _showSnackbar(
           'Unit marked as ${newStatus ? 'Active' : 'Inactive'}.');
       _loadUnits();
     } catch (e) {
-      if (!mounted) return;                               // ✅ mounted check
+      if (!mounted) return;
       _showSnackbar('Error updating status: $e', isError: true);
     }
   }
 
   // ── DELETE UNIT ──
   void _confirmDelete(Map<String, dynamic> unit) {
-  showDialog(
-    context: context,
-    builder: (dialogContext) => AlertDialog(   
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: const Text('Delete Unit'),
-      content: Text(
-        'Are you sure you want to delete "${unit['name']}"?\n\n'
-        'This removes the unit from Firestore. To also remove their login account, '
-        'delete them manually in Firebase Console → Authentication.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext),  // changes
-          child: const Text('Cancel'),
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
+        title: const Text('Delete Unit'),
+        content: Text(
+          'Are you sure you want to delete "${unit['name']}"?\n\n'
+          'This removes the unit from Firestore. To also remove their login account, '
+          'delete them manually in Firebase Console → Authentication.',
         ),
-        ElevatedButton(
-          onPressed: () async {
-            Navigator.pop(dialogContext);  // changes
-            await _deleteUnit(unit);
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red,
-            foregroundColor: Colors.white,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
           ),
-          child: const Text('Delete'),
-        ),
-      ],
-    ),
-  );
-}
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await _deleteUnit(unit);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _deleteUnit(Map<String, dynamic> unit) async {
     try {
       await _firestore.collection('units').doc(unit['id']).delete();
       await _firestore.collection('users').doc(unit['id']).delete();
-      if (!mounted) return;                               // ✅ mounted check
+      if (!mounted) return;
       _showSnackbar('Unit deleted successfully.');
       _loadUnits();
     } catch (e) {
-      if (!mounted) return;                               // ✅ mounted check
+      if (!mounted) return;
       _showSnackbar('Error deleting unit: $e', isError: true);
     }
   }
