@@ -11,6 +11,7 @@ import 'manage_viewer_admins_screen.dart';
 import 'tech_assistance_requests_screen.dart';
 import '../shared/calendar_screen.dart';
 import 'bug_reports_management_screen.dart';
+import '../../widgets/app_topbar.dart';
 
 class TechAdminHome extends StatefulWidget {
   const TechAdminHome({super.key});
@@ -22,17 +23,18 @@ class TechAdminHome extends StatefulWidget {
 class _TechAdminHomeState extends State<TechAdminHome> {
   int _selectedIndex = 0;
   bool _isDarkMode = false;
+  bool _isSidebarVisible = true; // <-- add this
 
   final List<NavItem> _navItems = [
     const NavItem(icon: Icons.dashboard, label: 'Dashboard'),
-    const NavItem(icon: Icons.feed, label: 'News Feed'),
+    const NavItem(icon: Icons.feed, label: 'Summary'),
     const NavItem(icon: Icons.calendar_month, label: 'Calendar'),
     NavItem(
       icon: Icons.history,
       label: 'Activities',
       children: [
-        const NavItem(icon: Icons.dynamic_feed, label: 'Recents'),
-        const NavItem(icon: Icons.campaign, label: 'Create Announcements'),
+        const NavItem(icon: Icons.dynamic_feed, label: 'My Activities'),
+        const NavItem(icon: Icons.campaign, label: 'Create Activity'),
       ],
     ),
     NavItem(
@@ -49,34 +51,17 @@ class _TechAdminHomeState extends State<TechAdminHome> {
   ];
 
   final List<Widget> _pages = [
-    const _PlaceholderPage(title: 'Dashboard'),                  // 0
-    const NewsFeedScreen(isTechAdmin: true),                     // 1
-    const CalendarScreen(calendarType: CalendarType.techAdmin),  // 2
-    const RecentsScreen(),                                       // 3
-    const CreateAnnouncementScreen(),                            // 4
-    const ManageUnitsScreen(),                                   // 5
-    const ManageViewerAdminsScreen(),                            // 6
-    const VenueManagementScreen(),                               // 7
-    const TechAssistanceRequestsScreen(),                        // 8
-    const BugReportsManagementScreen(),                          // 9
+    const _PlaceholderPage(title: 'Dashboard'),
+    const NewsFeedScreen(isTechAdmin: true),
+    const CalendarScreen(calendarType: CalendarType.techAdmin),
+    const RecentsScreen(),
+    const CreateAnnouncementScreen(),
+    const ManageUnitsScreen(),
+    const ManageViewerAdminsScreen(),
+    const VenueManagementScreen(),
+    const TechAssistanceRequestsScreen(),
+    const BugReportsManagementScreen(),
   ];
-
-  String get _currentPageTitle {
-    const titles = [
-      'Dashboard',
-      'News Feed',
-      'Calendar',
-      'Recents',
-      'Create Announcement',
-      'Manage Units',
-      'Manage Viewer Admins',
-      'Venue Management',
-      'Tech Assistance Requests',
-      'Bug Reports',
-    ];
-    if (_selectedIndex < titles.length) return titles[_selectedIndex];
-    return 'TEAM-PRO4A';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,55 +73,33 @@ class _TechAdminHomeState extends State<TechAdminHome> {
       home: Scaffold(
         body: Row(
           children: [
-            AppSidebar(
-              navItems: _navItems,
-              selectedIndex: _selectedIndex,
-              onItemSelected: (index) =>
-                  setState(() => _selectedIndex = index),
-              isDarkMode: _isDarkMode,
-              onDarkModeToggle: (val) =>
-                  setState(() => _isDarkMode = val),
-              roleLabel: 'Tech Admin',
-              roleColor: AppTheme.primaryBlue,
-              roleIcon: Icons.shield,
-            ),
+            if (_isSidebarVisible)
+              AppSidebar(
+                navItems: _navItems,
+                selectedIndex: _selectedIndex,
+                onItemSelected: (index) =>
+                    setState(() => _selectedIndex = index),
+                isDarkMode: _isDarkMode,
+                onDarkModeToggle: (val) =>
+                    setState(() => _isDarkMode = val),
+                roleLabel: 'Tech Admin',
+                roleColor: AppTheme.primaryBlue,
+                roleIcon: Icons.shield,
+              ),
             Expanded(
               child: Column(
                 children: [
-                  _buildTopBar(context),
+                  AppTopBar(
+                    onToggleSidebar: () =>
+                        setState(() => _isSidebarVisible = !_isSidebarVisible),
+                    isSidebarVisible: _isSidebarVisible,
+                  ),
                   Expanded(child: _pages[_selectedIndex]),
                 ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildTopBar(BuildContext context) {
-    return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        border: Border(
-          bottom: BorderSide(color: Colors.grey.shade200, width: 1),
-        ),
-      ),
-      child: Row(
-        children: [
-          Text(
-            _currentPageTitle,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const Spacer(),
-          const NotificationBell(),
-          const SizedBox(width: 8),
-        ],
       ),
     );
   }
@@ -155,11 +118,9 @@ class _PlaceholderPage extends StatelessWidget {
           const Icon(Icons.construction, size: 64, color: Colors.grey),
           const SizedBox(height: 16),
           Text(title,
-              style: const TextStyle(
-                  fontSize: 24, fontWeight: FontWeight.bold)),
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const Text('Coming soon...',
-              style: TextStyle(color: Colors.grey)),
+          const Text('Coming soon...', style: TextStyle(color: Colors.grey)),
         ],
       ),
     );

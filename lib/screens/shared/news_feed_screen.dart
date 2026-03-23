@@ -104,7 +104,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'News Feed',
+                      'Summary',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,

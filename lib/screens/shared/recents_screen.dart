@@ -52,7 +52,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Recents',
+                      'My Activities',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
