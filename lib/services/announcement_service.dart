@@ -300,4 +300,26 @@ class AnnouncementService {
       return [];
     }
   }
+
+  Future<List<Map<String, dynamic>>> getPersonnelFeed() async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) return [];
+
+      final snapshot = await _firestore
+          .collection('announcements')
+          .where(
+            'specificPersonnelPerUnit.${currentUser.uid}',
+            isNull: false,
+          )
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .toList();
+    } catch (e) {
+      return [];
+    }
+  }
 }
