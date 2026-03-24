@@ -300,4 +300,36 @@ class AnnouncementService {
       return [];
     }
   }
+
+  Future<List<Map<String, dynamic>>> getPersonnelFeed() async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) return [];
+
+      // Get personnel's unitId from their user document
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      if (!userDoc.exists) return [];
+
+      final unitId = userDoc.data()?['unitId'] ?? '';
+
+      if (unitId.isEmpty) return [];
+
+      // Get announcements where this unitId is in visibleTo
+      final snapshot = await _firestore
+          .collection('announcements')
+          .where('visibleTo', arrayContains: unitId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .toList();
+    } catch (e) {
+      return [];
+    }
+  }
 }
