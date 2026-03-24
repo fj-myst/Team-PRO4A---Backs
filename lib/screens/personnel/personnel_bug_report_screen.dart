@@ -57,9 +57,28 @@ class _PersonnelBugReportScreenState
   Future<void> _loadUserData() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
+
+    // Step 1: Get user document
     final doc = await _firestore.collection('users').doc(uid).get();
+    final userData = doc.data() as Map<String, dynamic>?;
+    final unitId = userData?['unitId'] ?? '';
+
+    // Step 2: Get unit name
+    String unitName = '';
+    if (unitId.isNotEmpty) {
+      final unitDoc = await _firestore
+          .collection('units')
+          .doc(unitId)
+          .get();
+      unitName = unitDoc.data()?['name'] ?? '';
+    }
+
+    // Step 3: Merge unitName into userData
     if (mounted) {
-      setState(() => _userData = doc.data() as Map<String, dynamic>?);
+      setState(() => _userData = {
+        ...?userData,
+        'unitName': unitName,
+      });
     }
   }
 
@@ -204,114 +223,114 @@ class _PersonnelBugReportScreenState
     }
   }
 
-  String get _clockString {
-    final h = _now.hour.toString().padLeft(2, '0');
-    final m = _now.minute.toString().padLeft(2, '0');
-    return '$h:$m PHT (UTC+8)';
+  Widget _buildHeader() {
+    final name = (_userData?['name'] ?? '')
+        .toString()
+        .toUpperCase();
+    final unitName = _userData?['unitName'] ?? '';
+    final position = _userData?['position'] ?? '';
+    final subtitle = [unitName, position]
+        .where((s) => s.isNotEmpty)
+        .join(' - ');
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0A1A3A),
+        image: DecorationImage(
+          image: AssetImage('assets/images/calabrz.png'),
+          fit: BoxFit.cover,
+          alignment: Alignment.centerRight,
+          opacity: 0.15,
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+
+              // TOP ROW: TEAM-PRO4A + logout
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'TEAM-PRO4A',
+                    style: TextStyle(
+                      color: Color.fromARGB(200, 255, 255, 255),
+                      fontSize: 25,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _confirmLogout,
+                    icon: const Icon(
+                      Icons.logout,
+                      color: Colors.white70,
+                      size: 20,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // PROFILE ROW: PNP seal + name + subtitle
+              Row(
+                children: [
+                  Image.asset(
+                    'assets/images/PNP-logo.png',
+                    width: 52,
+                    height: 52,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        if (subtitle.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            subtitle,
+                            style: const TextStyle(
+                              color: Colors.white60,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final name = (_userData?['name'] ?? 'Personnel')
-      .toString()
-      .toUpperCase();
-    final position = _userData?['position'] ?? '';
-
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
       body: Column(
         children: [
 
-          // ── HEADER ──
-          Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFF0A1A3A), // dark navy base
-              image: DecorationImage(
-                image: AssetImage('assets/images/calabrz.png'),
-                fit: BoxFit.cover,
-                alignment: Alignment.centerRight,
-                opacity: 0.15, // subtle — just enough to see the map
-              ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        IconButton(
-                          onPressed: _confirmLogout, // ← fixed
-                          icon: const Icon(Icons.logout,
-                              color: Colors.white70, size: 20),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                                color: Colors.white24, width: 2),
-                            color: Colors.white10,
-                          ),
-                          child: ClipOval(
-                            child: _userData?['sealUrl'] != null
-                                ? Image.network(
-                                    _userData!['sealUrl'],
-                                    fit: BoxFit.cover,
-                                  )
-                                : const Icon(Icons.shield,
-                                    color: Colors.white54,
-                                    size: 30),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              if (position.isNotEmpty) ...[
-                                const SizedBox(height: 3),
-                                Text(
-                                  position,
-                                  style: const TextStyle(
-                                    color: Colors.white60,
-                                    fontSize: 12,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          _buildHeader(),
 
-          // ── BODY ──
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
@@ -319,7 +338,6 @@ class _PersonnelBugReportScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
 
-                  // Heading
                   const Text(
                     'BUG REPORT',
                     style: TextStyle(
@@ -336,17 +354,14 @@ class _PersonnelBugReportScreenState
                   ),
                   const SizedBox(height: 24),
 
-                  // Category dropdown
                   _fieldLabel('CATEGORY'),
                   const SizedBox(height: 8),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
-                      border:
-                          Border.all(color: Colors.grey.shade200),
+                      border: Border.all(color: Colors.grey.shade200),
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
@@ -372,7 +387,6 @@ class _PersonnelBugReportScreenState
                   ),
                   const SizedBox(height: 20),
 
-                  // Title field
                   _fieldLabel('TITLE'),
                   const SizedBox(height: 8),
                   _textField(
@@ -382,7 +396,6 @@ class _PersonnelBugReportScreenState
                   ),
                   const SizedBox(height: 20),
 
-                  // Description field
                   _fieldLabel('DESCRIPTION'),
                   const SizedBox(height: 8),
                   _textField(
@@ -393,13 +406,11 @@ class _PersonnelBugReportScreenState
                   ),
                   const SizedBox(height: 32),
 
-                  // Submit button
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed:
-                          _isSubmitting ? null : _submitReport,
+                      onPressed: _isSubmitting ? null : _submitReport,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0A1A3A),
                         foregroundColor: Colors.white,

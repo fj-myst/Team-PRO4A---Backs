@@ -306,12 +306,22 @@ class AnnouncementService {
       final currentUser = _auth.currentUser;
       if (currentUser == null) return [];
 
+      // Get personnel's unitId from their user document
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      if (!userDoc.exists) return [];
+
+      final unitId = userDoc.data()?['unitId'] ?? '';
+
+      if (unitId.isEmpty) return [];
+
+      // Get announcements where this unitId is in visibleTo
       final snapshot = await _firestore
           .collection('announcements')
-          .where(
-            'specificPersonnelPerUnit.${currentUser.uid}',
-            isNull: false,
-          )
+          .where('visibleTo', arrayContains: unitId)
           .orderBy('createdAt', descending: true)
           .get();
 

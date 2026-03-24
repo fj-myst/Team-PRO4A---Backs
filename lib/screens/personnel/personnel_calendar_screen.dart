@@ -59,16 +59,36 @@ class _PersonnelCalendarScreenState
       final uid = _auth.currentUser?.uid;
       if (uid == null) return;
 
-      final results = await Future.wait([
-        _firestore.collection('users').doc(uid).get(),
-        _service.getPersonnelFeed(),
-      ]);
+      // Step 1: Get user document
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get();
+      final userData = userDoc.data() as Map<String, dynamic>?;
+      final unitId = userData?['unitId'] ?? '';
 
-      final userDoc = results[0] as DocumentSnapshot;
-      final data = results[1] as List<Map<String, dynamic>>;
+      // Step 2: Get unit name
+      String unitName = '';
+      if (unitId.isNotEmpty) {
+        final unitDoc = await _firestore
+            .collection('units')
+            .doc(unitId)
+            .get();
+        unitName = unitDoc.data()?['name'] ?? '';
+      }
+
+      // Step 3: Merge unitName into userData
+      final enrichedUserData = {
+        ...?userData,
+        'unitName': unitName,
+      };
+
+      // Step 4: Load announcements
+      final data = await _service.getPersonnelFeed();
 
       if (!mounted) return;
 
+      // Step 5: Map announcements by day for current month
       final Map<int, List<Map<String, dynamic>>> byDay = {};
       for (final a in data) {
         if (a['dateTime'] == null) continue;
@@ -80,7 +100,7 @@ class _PersonnelCalendarScreenState
       }
 
       setState(() {
-        _userData = userDoc.data() as Map<String, dynamic>?;
+        _userData = enrichedUserData;
         _announcements = data;
         _announcementsByDay = byDay;
       });
@@ -98,97 +118,96 @@ class _PersonnelCalendarScreenState
   }
 
   Future<void> _confirmLogout() async {
-  final confirm = await showDialog<bool>(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) => Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFF0A1A3A), width: 2),
-      ),
-      backgroundColor: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(28, 32, 28, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'CONFIRM LOGOUT',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF0A1A3A),
-                letterSpacing: 0.5,
+    final confirm = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFF0A1A3A), width: 2),
+        ),
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(28, 32, 28, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'CONFIRM LOGOUT',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF0A1A3A),
+                  letterSpacing: 0.5,
+                ),
               ),
-            ),
-            const SizedBox(height: 28),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 100,
-                  height: 42,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0A1A3A),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+              const SizedBox(height: 28),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 100,
+                    height: 42,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0A1A3A),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
-                    ),
-                    child: const Text(
-                      'YES',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                SizedBox(
-                  width: 100,
-                  height: 42,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4A6080),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text(
-                      'NO',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1,
+                      child: const Text(
+                        'YES',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 16),
+                  SizedBox(
+                    width: 100,
+                    height: 42,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4A6080),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'NO',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-
-  if (confirm == true) {
-    await FirebaseAuth.instance.signOut();
-    if (!mounted) return;
-    // ── Navigate back to LoginScreen, clearing the entire stack ──
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false, // removes all previous routes
     );
+
+    if (confirm == true) {
+      await FirebaseAuth.instance.signOut();
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    }
   }
-}
 
   void _prevMonth() {
     setState(() {
@@ -210,12 +229,6 @@ class _PersonnelCalendarScreenState
     _loadData();
   }
 
-  String get _clockString {
-    final h = _now.hour.toString().padLeft(2, '0');
-    final m = _now.minute.toString().padLeft(2, '0');
-    return '$h:$m PHT (UTC+8)';
-  }
-
   String get _monthName {
     const months = [
       'January', 'February', 'March', 'April',
@@ -228,11 +241,10 @@ class _PersonnelCalendarScreenState
   int get _daysInMonth =>
       DateTime(_currentMonth.year, _currentMonth.month + 1, 0).day;
 
-  // Sunday = 0 offset (DateTime.weekday: Mon=1...Sun=7)
   int get _firstWeekday {
     final firstDay =
         DateTime(_currentMonth.year, _currentMonth.month, 1);
-    return firstDay.weekday % 7; // Sun=0, Mon=1 ... Sat=6
+    return firstDay.weekday % 7;
   }
 
   String get _selectedDayLabel {
@@ -270,66 +282,69 @@ class _PersonnelCalendarScreenState
 
   // ── HEADER ──
   Widget _buildHeader() {
-    final name = (_userData?['name'] ?? 'Personnel')
-      .toString()
-      .toUpperCase();
+    final name = (_userData?['name'] ?? '')
+        .toString()
+        .toUpperCase();
+    final unitName = _userData?['unitName'] ?? '';
     final position = _userData?['position'] ?? '';
+    final subtitle = [unitName, position]
+        .where((s) => s.isNotEmpty)
+        .join(' - ');
 
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF0A1A3A), // dark navy base
+        color: Color(0xFF0A1A3A),
         image: DecorationImage(
           image: AssetImage('assets/images/calabrz.png'),
           fit: BoxFit.cover,
           alignment: Alignment.centerRight,
-          opacity: 0.15, // subtle — just enough to see the map
+          opacity: 0.15,
         ),
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
 
-              // Top row —  logout
+              // TOP ROW: TEAM-PRO4A + logout
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  const Text(
+                    'TEAM-PRO4A',
+                    style: TextStyle(
+                      color: Color.fromARGB(200, 250, 250, 250),
+                      fontSize: 25,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2,
+                    ),
+                  ),
                   IconButton(
-                    onPressed: _confirmLogout,           // ← new dialog logout
-                    icon: const Icon(Icons.logout,
-                        color: Colors.white70, size: 20),
+                    onPressed: _confirmLogout,
+                    icon: const Icon(
+                      Icons.logout,
+                      color: Colors.white70,
+                      size: 20,
+                    ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
 
-              // Profile row
+              // PROFILE ROW: PNP seal + name + subtitle
               Row(
                 children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                          color: Colors.white24, width: 2),
-                      color: Colors.white10,
-                    ),
-                    child: ClipOval(
-                      child: _userData?['sealUrl'] != null
-                          ? Image.network(
-                              _userData!['sealUrl'],
-                              fit: BoxFit.cover,
-                            )
-                          : const Icon(Icons.shield,
-                              color: Colors.white54, size: 30),
-                    ),
+                  Image.asset(
+                    'assets/images/PNP-logo.png',
+                    width: 52,
+                    height: 52,
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,19 +353,18 @@ class _PersonnelCalendarScreenState
                           name,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 17,
+                            fontSize: 16,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.5,
                           ),
                         ),
-                        if (position.isNotEmpty) ...[
+                        if (subtitle.isNotEmpty) ...[
                           const SizedBox(height: 3),
                           Text(
-                            position,
+                            subtitle,
                             style: const TextStyle(
                               color: Colors.white60,
                               fontSize: 12,
-                              height: 1.4,
                             ),
                           ),
                         ],
@@ -366,7 +380,7 @@ class _PersonnelCalendarScreenState
     );
   }
 
-  // ── BODY ─────────────────────────────────────────────────────
+  // ── BODY ──
   Widget _buildBody() {
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -379,19 +393,14 @@ class _PersonnelCalendarScreenState
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'CALENDAR',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0A1A3A),
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                  ],
+                const Text(
+                  'CALENDAR',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0A1A3A),
+                    letterSpacing: 1.2,
+                  ),
                 ),
                 Stack(
                   clipBehavior: Clip.none,
@@ -477,7 +486,7 @@ class _PersonnelCalendarScreenState
                     ),
                     const SizedBox(height: 12),
 
-                    // Day headers — Sun to Sat
+                    // Day headers
                     Row(
                       children: ['Su', 'Mo', 'Tu', 'We',
                                   'Th', 'Fr', 'Sa']
@@ -530,29 +539,27 @@ class _PersonnelCalendarScreenState
                 (context, index) {
                   final list =
                       _announcementsByDay[_selectedDay!.day] ?? [];
-                  if (list.isEmpty) {
-                    return _buildEmptyDay();
-                  }
+                  if (list.isEmpty) return _buildEmptyDay();
                   return _buildCard(list[index]);
                 },
-                childCount: (_announcementsByDay[_selectedDay!.day] ??
-                        [])
-                    .isEmpty
-                    ? 1
-                    : (_announcementsByDay[_selectedDay!.day] ?? [])
-                        .length,
+                childCount:
+                    (_announcementsByDay[_selectedDay!.day] ?? [])
+                            .isEmpty
+                        ? 1
+                        : (_announcementsByDay[_selectedDay!.day] ??
+                                [])
+                            .length,
               ),
             ),
           ),
         ],
 
-        const SliverToBoxAdapter(
-            child: SizedBox(height: 32)),
+        const SliverToBoxAdapter(child: SizedBox(height: 32)),
       ],
     );
   }
 
-  // ── DAY GRID ─────────────────────────────────────────────────
+  // ── DAY GRID ──
   Widget _buildDayGrid() {
     final totalCells = _firstWeekday + _daysInMonth;
     final rows = (totalCells / 7).ceil();
@@ -577,8 +584,7 @@ class _PersonnelCalendarScreenState
                 day == _selectedDay!.day &&
                 _currentMonth.month == _selectedDay!.month &&
                 _currentMonth.year == _selectedDay!.year;
-            final isWeekend =
-                colIndex == 0 || colIndex == 6;
+            final isWeekend = colIndex == 0 || colIndex == 6;
 
             return Expanded(
               child: GestureDetector(
@@ -601,13 +607,11 @@ class _PersonnelCalendarScreenState
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Today — dot above number
                       if (isToday && !isSelected)
                         Container(
                           width: 5,
                           height: 5,
-                          margin:
-                              const EdgeInsets.only(bottom: 2),
+                          margin: const EdgeInsets.only(bottom: 2),
                           decoration: const BoxDecoration(
                             color: Color(0xFF0A1A3A),
                             shape: BoxShape.circle,
@@ -627,16 +631,13 @@ class _PersonnelCalendarScreenState
                                   : const Color(0xFF0A1A3A),
                         ),
                       ),
-                      // Event dot below number
                       if (hasEvents && !isSelected) ...[
                         const SizedBox(height: 2),
                         Container(
                           width: 5,
                           height: 5,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Colors.white
-                                : const Color(0xFF1A3A6A),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF1A3A6A),
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -652,7 +653,7 @@ class _PersonnelCalendarScreenState
     );
   }
 
-  // ── ACTIVITY CARD ────────────────────────────────────────────
+  // ── ACTIVITY CARD ──
   Widget _buildCard(Map<String, dynamic> announcement) {
     final dateTime = announcement['dateTime'] != null
         ? (announcement['dateTime'] as Timestamp).toDate()
@@ -707,8 +708,7 @@ class _PersonnelCalendarScreenState
               const SizedBox(height: 14),
               const Divider(color: Colors.white24, height: 1),
               const SizedBox(height: 12),
-              _cardRow('VENUE:',
-                  announcement['venueName'] ?? 'TBA'),
+              _cardRow('VENUE:', announcement['venueName'] ?? 'TBA'),
               const SizedBox(height: 8),
               _cardRow('DATE AND TIME:', dateStr),
             ],
@@ -745,7 +745,7 @@ class _PersonnelCalendarScreenState
     );
   }
 
-  // ── EMPTY DAY ────────────────────────────────────────────────
+  // ── EMPTY DAY ──
   Widget _buildEmptyDay() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
@@ -757,8 +757,7 @@ class _PersonnelCalendarScreenState
             const SizedBox(height: 8),
             const Text(
               'No activities on this day',
-              style:
-                  TextStyle(color: Colors.grey, fontSize: 13),
+              style: TextStyle(color: Colors.grey, fontSize: 13),
             ),
           ],
         ),
@@ -766,57 +765,7 @@ class _PersonnelCalendarScreenState
     );
   }
 
-  // ── BOTTOM BAR ───────────────────────────────────────────────
-  Widget _buildBottomBar() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(
-          horizontal: 24, vertical: 10),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              _clockString,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0A1A3A),
-                letterSpacing: 0.3,
-              ),
-            ),
-            GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0A1A3A),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.calendar_month,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── HELPERS ──────────────────────────────────────────────────
+  // ── HELPERS ──
   String _weekdayName(int w) => const [
         '', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
       ][w];

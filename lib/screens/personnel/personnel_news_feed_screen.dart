@@ -53,19 +53,30 @@ class _PersonnelNewsFeedScreenState
       final uid = _auth.currentUser?.uid;
       if (uid == null) return;
 
-      // Load user profile + announcements in parallel
-      final results = await Future.wait([
-        _firestore.collection('users').doc(uid).get(),
-        _service.getPersonnelFeed(),
-      ]);
+      // Get user document
+      final userDoc = await _firestore.collection('users').doc(uid).get();
+      final userData = userDoc.data() as Map<String, dynamic>?;
+      final unitId = userData?['unitId'] ?? '';
 
-      final userDoc = results[0] as DocumentSnapshot;
-      final announcements =
-          results[1] as List<Map<String, dynamic>>;
+      // Get unit name from units collection
+      String unitName = '';
+      if (unitId.isNotEmpty) {
+        final unitDoc = await _firestore.collection('units').doc(unitId).get();
+        unitName = unitDoc.data()?['name'] ?? '';
+      }
+
+      // Merge unitName into userData
+      final enrichedUserData = {
+        ...?userData,
+        'unitName': unitName,
+      };
+
+      // Load announcements
+      final announcements = await _service.getPersonnelFeed();
 
       if (!mounted) return;
       setState(() {
-        _userData = userDoc.data() as Map<String, dynamic>?;
+        _userData = enrichedUserData;
         _announcements = announcements;
       });
     } catch (e) {
@@ -202,69 +213,73 @@ class _PersonnelNewsFeedScreenState
 
   // ── HEADER ──
   Widget _buildHeader() {
-    final name = (_userData?['name'] ?? 'Personnel')
-      .toString()
-      .toUpperCase();
+    final name = (_userData?['name'] ?? '')
+        .toString()
+        .toUpperCase();
+    final unitName = _userData?['unitName'] ?? '';
     final position = _userData?['position'] ?? '';
+    final subtitle = [unitName, position]
+        .where((s) => s.isNotEmpty)
+        .join(' - ');
+
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0A1A3A), // dark navy base
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1A3A),
         image: DecorationImage(
           image: AssetImage('assets/images/calabrz.png'),
           fit: BoxFit.cover,
           alignment: Alignment.centerRight,
-          opacity: 0.15, // subtle — just enough to see the map
+          opacity: 0.15,
         ),
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
 
-              // Top row — logout
+              // ── TOP ROW: TEAM-PRO4A title + logout ──
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  const Text(
+                    'TEAM-PRO4A',
+                    style: TextStyle(
+                      color: Color.fromARGB(200, 250, 250, 250),
+                      fontSize: 25,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2,
+                    ),
+                  ),
                   IconButton(
-                    onPressed: _confirmLogout,           // ← new dialog logout
-                    icon: const Icon(Icons.logout,
-                        color: Colors.white70, size: 20),
+                    onPressed: _confirmLogout,
+                    icon: const Icon(
+                      Icons.logout,
+                      color: Colors.white70,
+                      size: 20,
+                    ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
 
-              // Profile row — seal + name + unit
+              // ── PROFILE ROW: PNP seal + name + position ──
               Row(
                 children: [
 
-                  // PNP Seal placeholder (replace with Image.asset if you have the logo)
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                          color: Colors.white24, width: 2),
-                      color: Colors.white10,
-                    ),
-                    child: ClipOval(
-                      child: _userData?['sealUrl'] != null
-                          ? Image.network(
-                              _userData!['sealUrl'],
-                              fit: BoxFit.cover,
-                            )
-                          : const Icon(Icons.shield,
-                              color: Colors.white54, size: 30),
-                    ),
+                  // PNP Seal
+                  Image.asset(
+                    'assets/images/PNP-logo.png',
+                    width: 52,
+                    height: 52,
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
 
-                  // Name + unit
+                  // Name + position
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -273,19 +288,18 @@ class _PersonnelNewsFeedScreenState
                           name,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 17,
+                            fontSize: 16,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.5,
                           ),
                         ),
-                        if (position.isNotEmpty) ...[
+                        if (subtitle.isNotEmpty) ...[
                           const SizedBox(height: 3),
                           Text(
-                            position,
+                            subtitle,
                             style: const TextStyle(
                               color: Colors.white60,
                               fontSize: 12,
-                              height: 1.4,
                             ),
                           ),
                         ],
@@ -301,7 +315,7 @@ class _PersonnelNewsFeedScreenState
     );
   }
 
-  // ── BODY ─────────────────────────────────────────────────────
+  // ── BODY ──
   Widget _buildBody() {
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -385,7 +399,7 @@ class _PersonnelNewsFeedScreenState
     );
   }
 
-  // ── ANNOUNCEMENT CARD ────────────────────────────────────────
+  // ── ANNOUNCEMENT CARD ──
   Widget _buildCard(Map<String, dynamic> announcement) {
     final dateTime = announcement['dateTime'] != null
         ? (announcement['dateTime'] as Timestamp).toDate()
@@ -486,7 +500,7 @@ class _PersonnelNewsFeedScreenState
     );
   }
 
-  // ── BOTTOM BAR ───────────────────────────────────────────────
+  // ── BOTTOM BAR ──
   Widget _buildBottomBar() {
     return Container(
       decoration: const BoxDecoration(
@@ -548,7 +562,7 @@ class _PersonnelNewsFeedScreenState
     );
   }
 
-  // ── EMPTY STATE ──────────────────────────────────────────────
+  // ── EMPTY STATE ──
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -576,7 +590,7 @@ class _PersonnelNewsFeedScreenState
     );
   }
 
-  // ── HELPERS ──────────────────────────────────────────────────
+  // ── HELPERS ──
   String _weekday(int w) => const [
         '', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
       ][w];
