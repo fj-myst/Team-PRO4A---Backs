@@ -220,12 +220,54 @@ class _AppSidebarState extends State<AppSidebar> {
     );
   }
 
-  void _logout() async {
-    await AuthService().logout();
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
-  }
+  // REPLACE WITH THIS:
+void _logout() {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      title: const Text(
+        "Confirm Logout",
+        style: TextStyle(
+          color: Colors.black,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      content: const Text(
+        "Are you sure you want to logout?",
+        style: TextStyle(color: Colors.black87),
+      ),
+      actionsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      actions: [
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF0F2744),
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF0F2744),
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () async {
+            await AuthService().logout();
+            if (!mounted) return;
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+              (route) => false,
+            );
+          },
+          child: const Text("Logout"),
+        ),
+      ],
+    ),
+  );
+}
 }

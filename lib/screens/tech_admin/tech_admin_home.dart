@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../app_theme.dart';
 import '../../widgets/app_sidebar.dart';
-import '../../widgets/notification_bell.dart';
 import '../shared/create_announcement_screen.dart';
 import '../shared/recents_screen.dart';
 import '../shared/news_feed_screen.dart';
