@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
-import '../../app_theme.dart';
 import '../../services/announcement_service.dart';
 import '../shared/view_announcement_screen.dart';
-import 'personnel_calendar_screen.dart';
 import '../auth/login_screen.dart';
 
 class PersonnelNewsFeedScreen extends StatefulWidget {
-  const PersonnelNewsFeedScreen({super.key});
+  final Set<String> viewedIds;
+  final bool notificationsSeen;
+  final ValueChanged<Set<String>> onViewedIdsChanged;
+  final ValueChanged<bool> onNotificationsSeenChanged;
+
+  const PersonnelNewsFeedScreen({
+    super.key,
+    required this.viewedIds,
+    required this.notificationsSeen,
+    required this.onViewedIdsChanged,
+    required this.onNotificationsSeenChanged,
+  });
 
   @override
   State<PersonnelNewsFeedScreen> createState() =>
@@ -25,6 +34,9 @@ class _PersonnelNewsFeedScreenState
   List<Map<String, dynamic>> _announcements = [];
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
+  bool _showNotifications = false;
+
+  final GlobalKey _bellKey = GlobalKey();
 
   late Timer _clockTimer;
   late DateTime _now;
@@ -33,8 +45,7 @@ class _PersonnelNewsFeedScreenState
   void initState() {
     super.initState();
     _now = DateTime.now();
-    _clockTimer =
-        Timer.periodic(const Duration(seconds: 1), (_) {
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _now = DateTime.now());
     });
     _loadData();
@@ -53,25 +64,31 @@ class _PersonnelNewsFeedScreenState
       final uid = _auth.currentUser?.uid;
       if (uid == null) return;
 
-      // Get user document
-      final userDoc = await _firestore.collection('users').doc(uid).get();
+      // Step 1: Get user document
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get();
       final userData = userDoc.data() as Map<String, dynamic>?;
       final unitId = userData?['unitId'] ?? '';
 
-      // Get unit name from units collection
+      // Step 2: Get unit name
       String unitName = '';
       if (unitId.isNotEmpty) {
-        final unitDoc = await _firestore.collection('units').doc(unitId).get();
+        final unitDoc = await _firestore
+            .collection('units')
+            .doc(unitId)
+            .get();
         unitName = unitDoc.data()?['name'] ?? '';
       }
 
-      // Merge unitName into userData
+      // Step 3: Merge unitName
       final enrichedUserData = {
         ...?userData,
         'unitName': unitName,
       };
 
-      // Load announcements
+      // Step 4: Load announcements
       final announcements = await _service.getPersonnelFeed();
 
       if (!mounted) return;
@@ -79,6 +96,10 @@ class _PersonnelNewsFeedScreenState
         _userData = enrichedUserData;
         _announcements = announcements;
       });
+
+      // Reset notification state on fresh load
+      widget.onNotificationsSeenChanged(false);
+      widget.onViewedIdsChanged({});
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -92,139 +113,339 @@ class _PersonnelNewsFeedScreenState
     }
   }
 
-    Future<void> _confirmLogout() async {
-      final confirm = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFF0A1A3A), width: 2),
-          ),
-          backgroundColor: Colors.white,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(28, 32, 28, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'CONFIRM LOGOUT',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF0A1A3A),
-                    letterSpacing: 0.5,
+  Future<void> _confirmLogout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFF0A1A3A), width: 2),
+        ),
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(28, 32, 28, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'CONFIRM LOGOUT',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF0A1A3A),
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 28),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 100,
+                    height: 42,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0A1A3A),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'YES',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 28),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 100,
-                      height: 42,
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0A1A3A),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
+                  const SizedBox(width: 16),
+                  SizedBox(
+                    width: 100,
+                    height: 42,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4A6080),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Text(
-                          'YES',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1,
-                          ),
+                      ),
+                      child: const Text(
+                        'NO',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    SizedBox(
-                      width: 100,
-                      height: 42,
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4A6080),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: const Text(
-                          'NO',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
+      ),
+    );
+
+    if (confirm == true) {
+      await FirebaseAuth.instance.signOut();
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
       );
-
-      if (confirm == true) {
-        await FirebaseAuth.instance.signOut();
-        if (!mounted) return;
-        // ── Navigate back to LoginScreen, clearing the entire stack ──
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (route) => false, // removes all previous routes
-        );
-      }
     }
+  }
 
-  String get _clockString {
-    final h = _now.hour.toString().padLeft(2, '0');
-    final m = _now.minute.toString().padLeft(2, '0');
-    return '$h:$m PHT (UTC+8)';
+  void _toggleNotifications() {
+    final unviewed = _announcements
+        .where((a) => !widget.viewedIds.contains(a['id']))
+        .toList();
+
+    setState(() {
+      _showNotifications = !_showNotifications;
+      if (_showNotifications) {
+        widget.onNotificationsSeenChanged(true);
+        if (unviewed.isEmpty) _showNotifications = false;
+      }
+    });
+  }
+
+  String _formatDate(dynamic dateTime) {
+    if (dateTime == null) return 'TBA';
+    final dt = (dateTime as Timestamp).toDate();
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final h = dt.hour.toString().padLeft(2, '0');
+    final m = dt.minute.toString().padLeft(2, '0');
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}  $h:$m';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
-      body: Column(
+      body: Stack(
         children: [
-          _buildHeader(),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(
-                    onRefresh: _loadData,
-                    child: _buildBody(),
-                  ),
+          Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : RefreshIndicator(
+                        onRefresh: _loadData,
+                        child: _buildBody(),
+                      ),
+              ),
+            ],
           ),
+
+          // Tap outside to close
+          if (_showNotifications)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () =>
+                    setState(() => _showNotifications = false),
+                behavior: HitTestBehavior.translucent,
+                child: Container(color: Colors.transparent),
+              ),
+            ),
+
+          // Notification dropdown
+          if (_showNotifications)
+            Positioned(
+              top: _getNotificationPanelTop(),
+              right: 12,
+              child: _buildNotificationPanel(),
+            ),
         ],
+      ),
+    );
+  }
+
+  double _getNotificationPanelTop() {
+    final RenderBox? box =
+        _bellKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return 120;
+    final position = box.localToGlobal(Offset.zero);
+    return position.dy + box.size.height + 4;
+  }
+
+  // ── NOTIFICATION PANEL ──
+  Widget _buildNotificationPanel() {
+    final unviewed = _announcements
+        .where((a) => !widget.viewedIds.contains(a['id']))
+        .take(5)
+        .toList();
+
+    return Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(12),
+      color: Colors.white,
+      child: Container(
+        width: 300,
+        constraints: const BoxConstraints(maxHeight: 360),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+
+            // Panel header
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 12),
+              decoration: const BoxDecoration(
+                color: Color(0xFF0A1A3A),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'NOTIFICATIONS',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () =>
+                        setState(() => _showNotifications = false),
+                    child: const Icon(Icons.close,
+                        color: Colors.white60, size: 16),
+                  ),
+                ],
+              ),
+            ),
+
+            // Items
+            if (unviewed.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'No new announcements',
+                  style:
+                      TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  itemCount: unviewed.length,
+                  separatorBuilder: (_, __) => Divider(
+                      height: 1, color: Colors.grey.shade100),
+                  itemBuilder: (context, index) {
+                    final a = unviewed[index];
+                    return InkWell(
+                      onTap: () {
+                        final id = a['id'] as String?;
+                        if (id != null) {
+                          final updated =
+                              Set<String>.from(widget.viewedIds)
+                                ..add(id);
+                          widget.onViewedIdsChanged(updated);
+                        }
+                        setState(() => _showNotifications = false);
+                        ViewAnnouncementScreen.show(context, a);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        child: Row(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0A1A3A)
+                                    .withOpacity(0.08),
+                                borderRadius:
+                                    BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.campaign,
+                                color: Color(0xFF0A1A3A),
+                                size: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    a['title'] ?? 'Untitled',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF0A1A3A),
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    _formatDate(a['dateTime']),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right,
+                                color: Colors.grey, size: 16),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 
   // ── HEADER ──
   Widget _buildHeader() {
-    final name = (_userData?['name'] ?? '')
-        .toString()
-        .toUpperCase();
+    final name =
+        (_userData?['name'] ?? '').toString().toUpperCase();
     final unitName = _userData?['unitName'] ?? '';
     final position = _userData?['position'] ?? '';
-    final subtitle = [unitName, position]
-        .where((s) => s.isNotEmpty)
-        .join(' - ');
+    final subtitle =
+        [unitName, position].where((s) => s.isNotEmpty).join(' - ');
 
     return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A1A3A),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0A1A3A),
         image: DecorationImage(
           image: AssetImage('assets/images/calabrz.png'),
           fit: BoxFit.cover,
@@ -239,15 +460,13 @@ class _PersonnelNewsFeedScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
-              // ── TOP ROW: TEAM-PRO4A title + logout ──
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
                     'TEAM-PRO4A',
                     style: TextStyle(
-                      color: Color.fromARGB(200, 250, 250, 250),
+                      color: Color.fromARGB(200, 255, 255, 255),
                       fontSize: 25,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 2,
@@ -255,31 +474,19 @@ class _PersonnelNewsFeedScreenState
                   ),
                   IconButton(
                     onPressed: _confirmLogout,
-                    icon: const Icon(
-                      Icons.logout,
-                      color: Colors.white70,
-                      size: 20,
-                    ),
+                    icon: const Icon(Icons.logout,
+                        color: Colors.white70, size: 20),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
                 ],
               ),
               const SizedBox(height: 10),
-
-              // ── PROFILE ROW: PNP seal + name + position ──
               Row(
                 children: [
-
-                  // PNP Seal
-                  Image.asset(
-                    'assets/images/PNP-logo.png',
-                    width: 52,
-                    height: 52,
-                  ),
+                  Image.asset('assets/images/PNP-logo.png',
+                      width: 52, height: 52),
                   const SizedBox(width: 12),
-
-                  // Name + position
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,9 +505,8 @@ class _PersonnelNewsFeedScreenState
                           Text(
                             subtitle,
                             style: const TextStyle(
-                              color: Colors.white60,
-                              fontSize: 12,
-                            ),
+                                color: Colors.white60,
+                                fontSize: 12),
                           ),
                         ],
                       ],
@@ -324,57 +530,61 @@ class _PersonnelNewsFeedScreenState
         // NEWS FEED heading + bell
         SliverToBoxAdapter(
           child: Padding(
-            padding:
-                const EdgeInsets.fromLTRB(20, 24, 20, 16),
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'NEWS FEED',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF0A1A3A),
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                  ],
+                const Text(
+                  'NEWS FEED',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF0A1A3A),
+                    letterSpacing: 1.2,
+                  ),
                 ),
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(
-                        Icons.notifications_none,
-                        color: Color(0xFF0A1A3A),
-                        size: 28,
+
+                // Bell with badge
+                GestureDetector(
+                  key: _bellKey,
+                  onTap: _toggleNotifications,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.notifications_none,
+                          color: Color(0xFF0A1A3A),
+                          size: 28,
+                        ),
                       ),
-                    ),
-                    if (_announcements.isNotEmpty)
-                      Positioned(
-                        top: 6,
-                        right: 6,
-                        child: Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            '${_announcements.length}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
+                      if (_announcements
+                              .where((a) => !widget.viewedIds
+                                  .contains(a['id']))
+                              .isNotEmpty &&
+                          !widget.notificationsSeen)
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              '${_announcements.where((a) => !widget.viewedIds.contains(a['id'])).length}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -414,18 +624,22 @@ class _PersonnelNewsFeedScreenState
         : 'TBA';
 
     return GestureDetector(
-      onTap: () =>
-          ViewAnnouncementScreen.show(context, announcement),
+      onTap: () {
+        final id = announcement['id'] as String?;
+        if (id != null) {
+          final updated = Set<String>.from(widget.viewedIds)
+            ..add(id);
+          widget.onViewedIdsChanged(updated);
+        }
+        ViewAnnouncementScreen.show(context, announcement);
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0D2145),
-              Color(0xFF1A3A6A),
-            ],
+            colors: [Color(0xFF0D2145), Color(0xFF1A3A6A)],
           ),
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
@@ -442,8 +656,6 @@ class _PersonnelNewsFeedScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-
-              // Title — centered
               Text(
                 (announcement['title'] ?? 'UNTITLED')
                     .toString()
@@ -459,10 +671,8 @@ class _PersonnelNewsFeedScreenState
               const SizedBox(height: 14),
               const Divider(color: Colors.white24, height: 1),
               const SizedBox(height: 12),
-
-              // Info rows — left aligned
-              _cardRow('VENUE:',
-                  announcement['venueName'] ?? 'TBA'),
+              _cardRow(
+                  'VENUE:', announcement['venueName'] ?? 'TBA'),
               const SizedBox(height: 8),
               _cardRow('DATE AND TIME:', dateStr),
             ],
@@ -490,75 +700,10 @@ class _PersonnelNewsFeedScreenState
           child: Text(
             value,
             style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-            ),
+                color: Colors.white, fontSize: 12),
           ),
         ),
       ],
-    );
-  }
-
-  // ── BOTTOM BAR ──
-  Widget _buildBottomBar() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(
-          horizontal: 24, vertical: 10),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-
-            // Live clock
-            Text(
-              _clockString,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0A1A3A),
-                letterSpacing: 0.3,
-              ),
-            ),
-
-            // Calendar button
-            GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        const PersonnelCalendarScreen(),
-                  ),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0A1A3A),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.calendar_month,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -568,8 +713,7 @@ class _PersonnelNewsFeedScreenState
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.feed,
-              size: 64, color: Colors.grey.shade300),
+          Icon(Icons.feed, size: 64, color: Colors.grey.shade300),
           const SizedBox(height: 16),
           const Text(
             'No announcements yet',
