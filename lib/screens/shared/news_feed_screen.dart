@@ -138,7 +138,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                   ),
                   const SizedBox(width: 8),
                   _filterChip(
-                    label: 'Tagged',
+                    label: 'Attendees',
                     filter: _FeedFilter.tagged,
                     color: Colors.blue,
                     icon: Icons.label,
@@ -147,7 +147,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                   _filterChip(
                     label: 'Tech Assistance',
                     filter: _FeedFilter.techAssistance,
-                    color: Colors.green,
+                    color: const Color.fromARGB(255, 248, 168, 64),
                     icon: Icons.build_circle,
                   ),
                 ],
@@ -321,7 +321,7 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
                     _buildBadge(
                       label: 'Tech Assist',
                       icon: Icons.build_circle,
-                      color: Colors.green,
+                      color: const Color.fromARGB(255, 248, 168, 64),
                     ),
                   ],
                 ] else ...[

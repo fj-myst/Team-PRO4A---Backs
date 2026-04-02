@@ -224,13 +224,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   _filterChip(
                     label: 'Tech Assistance',
                     filter: _CalendarFilter.techAssistance,
-                    color: Colors.green,
+                    color: const Color.fromARGB(255, 248, 168, 64),
                     icon: Icons.build_circle,
                   ),
                   const SizedBox(width: 16),
                   _legendDot(Colors.blue, 'Tagged'),
                   const SizedBox(width: 10),
-                  _legendDot(Colors.green, 'Tech Assist'),
+                  _legendDot(const Color.fromARGB(255, 248, 168, 64), 'Tech Assist'),
                 ],
               ),
             ],
@@ -474,8 +474,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 cellColor = Colors.blue.withOpacity(0.07);
                 borderColor = Colors.blue.withOpacity(0.3);
               } else if (hasTech) {
-                cellColor = Colors.green.withOpacity(0.07);
-                borderColor = Colors.green.withOpacity(0.3);
+                cellColor = const Color.fromARGB(255, 248, 168, 64).withOpacity(0.07);
+                borderColor = const Color.fromARGB(255, 248, 168, 64).withOpacity(0.3);
               }
             }
 
@@ -617,7 +617,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             height: 6,
             margin: const EdgeInsets.symmetric(horizontal: 1),
             decoration: const BoxDecoration(
-              color: Colors.green,
+              color: Color.fromARGB(255, 248, 168, 64),
               shape: BoxShape.circle,
             ),
           ),
@@ -695,7 +695,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             borderColor = Colors.blue;
           } else if (category ==
               _AnnouncementCategory.techAssistance) {
-            borderColor = Colors.green;
+            borderColor = Color.fromARGB(255, 248, 168, 64);
           } else if (category == _AnnouncementCategory.both) {
             borderColor = Colors.blue;
           }
@@ -780,7 +780,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 category ==
                                     _AnnouncementCategory.both)
                               _dialogBadge('Tech Assist',
-                                  Icons.build_circle, Colors.green),
+                                  Icons.build_circle, Color.fromARGB(255, 248, 168, 64)),
                           ],
                         )
                       else if (a['needsTechAssist'] == true)

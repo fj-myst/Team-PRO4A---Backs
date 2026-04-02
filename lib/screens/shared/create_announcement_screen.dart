@@ -126,7 +126,7 @@ class _CreateAnnouncementScreenState
                     const SizedBox(height: 24),
 
                     // ── 2. AUTHORITY ──
-                    _buildLabel('2.  Authority *'),
+                    _buildLabel('2.  Authority '),
                     const SizedBox(height: 8),
                     _buildTextField(
                       controller: _authorityController,
@@ -761,10 +761,6 @@ class _CreateAnnouncementScreenState
   void _submit() async {
     if (_titleController.text.trim().isEmpty) {
       setState(() => _errorMessage = 'Please enter a title.');
-      return;
-    }
-    if (_authorityController.text.trim().isEmpty) {
-      setState(() => _errorMessage = 'Please enter the authority.');
       return;
     }
     if (_toPresideController.text.trim().isEmpty) {
